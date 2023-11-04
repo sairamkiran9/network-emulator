@@ -25,40 +25,40 @@ class Bridge:
         sockfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sockfd.bind(('', 0))
         sockfd.listen(5)
-        
+
         self.host_ip = socket.gethostname()
         self.host_port = sockfd.getsockname()[1]
         print("[INFO] Bridge intitalized on {} on port {}".format(self.host_ip, self.host_port))
         print("[INFO] Creating symlink for {}".format(self.name))
         self.create_symlink()
-        
-        allset = [sockfd]
+
+        main_fdset = [sockfd]
         sock_vector = []
 
         while True:
-            rlist, _, _ = select.select(allset, [], [])
-            for r in rlist:
+            new_fdset, _, _ = select.select(main_fdset, [], [])
+            for r in new_fdset:
                 if r == sockfd:
-                    rec_sock, temp_addr = sockfd.accept()
-                    addr_info = rec_sock.getpeername()
-                    print("Server: connect from '{}' {} {}:{}".format(self.host_ip,temp_addr,addr_info[0] ,addr_info[1]))
-                    sock_vector.append(rec_sock)
-                    allset.append(rec_sock)
+                    new_conn_sockfd, new_conn_addr = sockfd.accept()
+                    addr_info = new_conn_sockfd.getpeername()
+                    print("[INFO] Bridge: connect from '{}' {} {}:{}".format(self.host_ip,new_conn_addr, addr_info[0] , addr_info[1]))
+                    sock_vector.append(new_conn_sockfd)
+                    main_fdset.append(new_conn_sockfd)
                 else:
                     data = r.recv(100)
                     if not data:
                         addr_info = r.getpeername()
-                        print("Server: disconnect from {}:{}".format(addr_info[0],addr_info[1]))
+                        print("[INFO] Bridge: disconnect from {}:{}".format(addr_info[0],addr_info[1]))
                         r.close()
-                        allset.remove(r)
+                        main_fdset.remove(r)
                         sock_vector.remove(r)
                     else:
                         print("{}:{}: {}".format(addr_info[0], addr_info[1], data.decode()))
                         self.broadcast_msg(data, r, sock_vector)
                     
     def create_symlink(self):
-        symlink_path_to_host = ".{}.host".format(self.name)
-        symlink_path_to_port = ".{}.port".format(self.name)
+        symlink_path_to_host = "./symlinks/.{}.addr".format(self.name)
+        symlink_path_to_port = "./symlinks/.{}.port".format(self.name)
         
         with open(symlink_path_to_host, "w") as file:
             file.write(self.host_ip)
