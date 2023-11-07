@@ -2,10 +2,9 @@ import os
 import sys
 import socket
 import select
+import pickle
 from collections import defaultdict
-# from utils.interfaces import Interface
-# from utils.routetables import RouteTable
-from utils.utils import Interface, RouteTable, DataFrame, ARP
+from utils.utils import Interface, RouteTable, DataFrame, ARP, Hosts
 
 class Station:
     def __init__(self, params):
@@ -13,6 +12,7 @@ class Station:
         self.iface = self.read_file(params[2])
         self.rtable = self.read_file(params[3])
         self.name = list(self.iface.keys())
+        self.hosts = Hosts(params[4]).get_hosts()
         
     def print_details(self):
         print("""[DEBUG] Station details:
@@ -20,7 +20,7 @@ class Station:
             iface_path \t- {}
             rtable_path \t\t- {}
             router \t- {}
-            """.format(self.name, self.iface_path, self.rtable_path, self.type))
+            """.format(self.name, self.isroute, self.rtable, self.iface))
               
     def initialize(self):
         cur_iface = self.iface[self.name[0]]
@@ -34,6 +34,10 @@ class Station:
         for addr in hints:
             try:
                 sockfd = socket.socket(addr[0], addr[1], addr[2])
+                print(addr)
+                station_ip = self.hosts[self.name[0]]
+                print("station ip", station_ip)
+                # sockfd.bind((station_ip,0))
                 sockfd.connect(addr[4])
                 break
             except socket.error:
@@ -65,22 +69,31 @@ class Station:
             for r in temp_set:
                 if r == sockfd:
                     # Read server response
-                    data = r.recv(100)
-                    if not data:
+                    data_frame = r.recv(4096)
+                    if not data_frame:
                         print("Server disconnected.")
-                        sys.exit(0)
-                    print("{} >> {}".format(self.name, data.decode()))
+                        # sys.exit(0)
+                    data = pickle.loads(data_frame)
+                    data.print_dataframe()
+                    print("{} >> {}".format(self.name, data.msg))
                 if r == sys.stdin:
                     # Write client input to the server
                     msg = sys.stdin.readline()
                     if not msg:
                         sys.exit(0)
-                    data_frame = self.encapsualte(msg)
+                    src_name = self.name[0]
+                    data_frame = self.encapsualte(msg, self.iface[src_name][0].ip, self.iface[src_name][0].mac, "", "")
+                    serialised_data = pickle.dumps(data_frame)
+                    sockfd.send(serialised_data)
                     
-                    sockfd.send(data.encode())
-                    
-    def encapsualte(self, data):
+    def encapsualte(self, msg, src_ip, src_mac, dest_ip, dest_mac):
         data_frame = DataFrame()
+        data_frame.msg = msg.replace("\n","").strip()
+        data_frame.dll_src_ip = src_ip
+        data_frame.dll_src_mac = src_mac
+        data_frame.dll_dest_ip = dest_ip
+        data_frame.dll_dest_mac = dest_mac
+        return data_frame
                     
     def read_file(self, filename):
         metadata = defaultdict(list)

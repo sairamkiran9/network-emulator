@@ -2,7 +2,9 @@ import os
 import sys
 import socket
 import select
-            
+import pickle
+from utils.utils import Interface, RouteTable, DataFrame, ARP
+          
 class Bridge:
     def __init__(self, params):
         self.name = params[1]
@@ -45,7 +47,7 @@ class Bridge:
                     sock_vector.append(new_conn_sockfd)
                     main_fdset.append(new_conn_sockfd)
                 else:
-                    data = r.recv(100)
+                    data = r.recv(4096)
                     if not data:
                         addr_info = r.getpeername()
                         print("[INFO] Bridge: disconnect from {}:{}".format(addr_info[0],addr_info[1]))
@@ -53,7 +55,7 @@ class Bridge:
                         main_fdset.remove(r)
                         sock_vector.remove(r)
                     else:
-                        print("{}:{}: {}".format(addr_info[0], addr_info[1], data.decode()))
+                        # print("{}:{}: {}".format(addr_info[0], addr_info[1], data))
                         self.broadcast_msg(data, r, sock_vector)
                     
     def create_symlink(self):
@@ -69,11 +71,15 @@ class Bridge:
         print("[INFO] Created symlink for {}".format(self.name))
 
 
-    def broadcast_msg(self, msg, cur_fd, sock_vector):
-        msg = msg.decode()
+    def broadcast_msg(self, data_frame, cur_fd, sock_vector):
+        deseriablised_msg = pickle.loads(data_frame)
+        deseriablised_msg.print_dataframe()
+        serialised_msg = pickle.dumps(deseriablised_msg)
+        # print(sock_vector)
         for fd in sock_vector:
             if cur_fd != fd:
-                fd.send(msg.encode())
+                fd.send(serialised_msg)
+                
 
 def load_args():
     args = sys.argv
