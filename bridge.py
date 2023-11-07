@@ -3,7 +3,7 @@ import sys
 import socket
 import select
 import pickle
-from utils.utils import Interface, RouteTable, DataFrame, ARP
+from utils.utils import Interface, RouteTable, DataFrame, ARP, SL
           
 class Bridge:
     def __init__(self, params):
@@ -11,6 +11,7 @@ class Bridge:
         self.capacity = int(params[2])
         self.host_ip = ""
         self.host_port = -1
+        self.sl = SL()
         
     def print_details(self):
         print("""[DEBUG] Bridge details:
@@ -22,12 +23,11 @@ class Bridge:
                     
     def inititalize(self):
         print("[INFO] Initializing bridge")
-        
         sockfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sockfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sockfd.bind(('', 0))
         sockfd.listen(5)
-
+        print("[INFO] Socket fd", sockfd)
         self.host_ip = socket.gethostname()
         self.host_port = sockfd.getsockname()[1]
         print("[INFO] Bridge intitalized on {} on port {}".format(self.host_ip, self.host_port))
@@ -73,12 +73,36 @@ class Bridge:
 
     def broadcast_msg(self, data_frame, cur_fd, sock_vector):
         deseriablised_msg = pickle.loads(data_frame)
-        deseriablised_msg.print_dataframe()
-        serialised_msg = pickle.dumps(deseriablised_msg)
-        # print(sock_vector)
-        for fd in sock_vector:
-            if cur_fd != fd:
-                fd.send(serialised_msg)
+        # deseriablised_msg.print_dataframe()
+        if deseriablised_msg["type"] == "arp_request":
+            # send arp request to all stations
+            # create sl table
+            # print("desrialised_msg", deseriablised_msg)
+            dest_mac = deseriablised_msg["dest_mac"]
+            if dest_mac in self.sl.table:
+                deseriablised_msg["type"] = "arp_reply"
+                deseriablised_msg["fd"] = self.sl.table[dest_mac]
+                serialised_arp = pickle.dumps(deseriablised_msg)
+                cur_fd.send(serialised_arp)
+            else:
+                print("[INFO] Sending ARP Request to station")
+                self.sl.table[deseriablised_msg["src_mac"]] = cur_fd
+                serialised_arp = pickle.dumps(deseriablised_msg)
+                for fd in sock_vector:
+                    if cur_fd != fd:
+                        fd.send(serialised_arp)
+        elif deseriablised_msg["type"] == "arp_reply":
+            self.sl.table[deseriablised_msg["dest_mac"]] = cur_fd
+            reply_fd = self.sl.table[deseriablised_msg["src_mac"]]
+            serialised_arp = pickle.dumps(deseriablised_msg)
+            reply_fd.send(serialised_arp)
+        else:  
+            # normal dataframe broadcasting  
+            data = deseriablised_msg["data"]  
+            serialised_msg = pickle.dumps(deseriablised_msg)
+            print(self.sl.table)
+            station_fd = self.sl.table[data.dll_dest_mac]
+            station_fd.send(serialised_msg)
                 
 
 def load_args():

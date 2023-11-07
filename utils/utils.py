@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 
 class Hosts:
     def __init__(self, filename):
@@ -54,13 +55,14 @@ class RouteTable:
             nwmask \t- {}
             iface \t- {}
             """.format(self.dest_ip, self.next_hop, self.nwmask, self.iface))
-        
+         
 class DataFrame:
     msg = ""
     dll_src_ip = ""
     dll_src_mac = ""
     dll_dest_ip = ""
     dll_dest_mac = ""
+    fd = 0
     
     def __init__(self):
         pass
@@ -77,15 +79,17 @@ class DataFrame:
         
 class ARP:
     def __init__(self):
-        pass
+        self.table = {}
+        self.cache = {}
+        self.iscache = False
     
 class SL:
     def __init__(self):
-        pass
+        self.table = {}
     
 class PQ:
     def __init__(self):
-        pass
+        self.table = defaultdict(list)
         
 # hosts = Hosts("./hosts")
 # print(hosts.get_hosts())

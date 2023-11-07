@@ -4,7 +4,7 @@ import socket
 import select
 import pickle
 from collections import defaultdict
-from utils.utils import Interface, RouteTable, DataFrame, ARP, Hosts
+from utils.utils import Interface, RouteTable, DataFrame, ARP, Hosts, PQ
 
 class Station:
     def __init__(self, params):
@@ -13,6 +13,8 @@ class Station:
         self.rtable = self.read_file(params[3])
         self.name = list(self.iface.keys())
         self.hosts = Hosts(params[4]).get_hosts()
+        self.arp = ARP()
+        self.pq = PQ()
         
     def print_details(self):
         print("""[DEBUG] Station details:
@@ -24,7 +26,6 @@ class Station:
               
     def initialize(self):
         cur_iface = self.iface[self.name[0]]
-        print(cur_iface[0].lanname)
         with open("./symlinks/.{}.addr".format(cur_iface[0].lanname)) as file:
             bridge_ip = file.read()
         with open("./symlinks/.{}.port".format(cur_iface[0].lanname)) as file:
@@ -34,10 +35,8 @@ class Station:
         for addr in hints:
             try:
                 sockfd = socket.socket(addr[0], addr[1], addr[2])
-                print(addr)
                 station_ip = self.hosts[self.name[0]]
-                print("station ip", station_ip)
-                # sockfd.bind((station_ip,0))
+                print("station - ", self.name[0], station_ip)
                 sockfd.connect(addr[4])
                 break
             except socket.error:
@@ -72,23 +71,61 @@ class Station:
                     data_frame = r.recv(4096)
                     if not data_frame:
                         print("Server disconnected.")
-                        # sys.exit(0)
+                        sys.exit(0)
                     data = pickle.loads(data_frame)
-                    data.print_dataframe()
-                    print("{} >> {}".format(self.name, data.msg))
+                    if data["type"] == "arp_request":
+                        for station in self.name:
+                            if data["dest_ip"] == self.hosts[station]:
+                                data["dest_mac"] = self.iface[station][0].mac
+                                data["type"] = "arp_reply"
+                                serialised_arp = pickle.dumps(data) 
+                                r.send(serialised_arp)
+                    elif data["type"] == "arp_reply":
+                        dest_ip = data["dest_ip"]
+                        self.arp.cache[dest_ip] = data["dest_mac"]
+                        self.arp.table[dest_ip] = data["dest_mac"]
+                        if dest_ip in self.pq.table:
+                            data_frame = { "type": "dataframe", "data": self.encapsualte(self.pq.table[data["dest_ip"]], data["src_ip"], data["src_mac"], data["dest_ip"], data["dest_mac"])}
+                            self.pq.table[data["dest_ip"]].pop(0)
+                            serialised_data = pickle.dumps(data_frame)
+                            sockfd.send(serialised_data)
+                    elif data["data"].dll_dest_mac == self.iface[self.name[0]][0].mac:
+                        data["data"].print_dataframe()
+                        print("{} >> {}".format(self.name[0], data["data"].msg))
                 if r == sys.stdin:
                     # Write client input to the server
                     msg = sys.stdin.readline()
                     if not msg:
                         sys.exit(0)
-                    src_name = self.name[0]
-                    data_frame = self.encapsualte(msg, self.iface[src_name][0].ip, self.iface[src_name][0].mac, "", "")
-                    serialised_data = pickle.dumps(data_frame)
-                    sockfd.send(serialised_data)
+                    msg_args = msg.split(" ", 3)
+                    if msg_args[0] == "send":
+                        src_name = self.name[0]  
+                        dest_host = msg.split(" ")[1]
+                        dest_ip = self.hosts[dest_host]
+                        src_ip = self.iface[src_name][0].ip
+                        src_mac = self.iface[src_name][0].mac
+                        if dest_host in self.arp.table or dest_host in self.arp.cache :    
+                            dest_mac = self.arp_table[dest_host]["mac"]
+                            data_frame = { "type": "dataframe", 
+                                          "data": self.encapsualte(msg_args[-1], src_ip, src_mac, dest_ip, dest_mac)}
+                            serialised_data = pickle.dumps(data_frame)
+                            sockfd.send(serialised_data)
+                        else:
+                            self.pq.table[dest_ip].append(msg_args[-1])
+                            print("[INFO]", self.pq.table)
+                            arp_frame = {
+                                "type": "arp_request",
+                                "src_ip": src_ip,
+                                "src_mac": src_mac,
+                                "dest_ip": dest_ip,
+                                "dest_mac": "FF:FF:FF:FF",
+                            }
+                            serialised_data = pickle.dumps(arp_frame)
+                            sockfd.send(serialised_data)
                     
     def encapsualte(self, msg, src_ip, src_mac, dest_ip, dest_mac):
         data_frame = DataFrame()
-        data_frame.msg = msg.replace("\n","").strip()
+        data_frame.msg = msg[0].replace("\n","").strip()
         data_frame.dll_src_ip = src_ip
         data_frame.dll_src_mac = src_mac
         data_frame.dll_dest_ip = dest_ip
