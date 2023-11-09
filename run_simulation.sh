@@ -9,7 +9,7 @@ xterm -T "BRIDGE cs1" -iconic -e python3 bridge.py cs1 8 &
 xterm -T "BRIDGE cs2" -iconic -e python3 bridge.py cs2 8 &
 xterm -T "BRIDGE cs3" -iconic -e python3 bridge.py cs3 8 &
 sleep 1
-xterm -T "Host A" -e python3 station.py -no ./ifaces/ifaces.a ./rtables/rtable.a hosts &
+xterm -T "Host A" -e python3 station.py -no ifaces/ifaces.a rtables/rtable.a hosts &
 sleep 1
 xterm -T "Host B" -e python3 station.py -no ifaces/ifaces.b rtables/rtable.b hosts &
 sleep 1

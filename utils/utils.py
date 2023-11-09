@@ -4,7 +4,7 @@ from collections import defaultdict
 class Hosts:
     def __init__(self, filename):
         self.hosts = self.load_hosts(filename)
-        self.print_hosts()
+        self.print_details()
     
     def load_hosts(self, filename):
         hosts = {}
@@ -19,7 +19,7 @@ class Hosts:
     def get_hosts(self):
         return self.hosts
     
-    def print_hosts(self):
+    def print_details(self):
         print("[INFO] Available hosts: ")
         for host, ip in self.hosts.items():
             print(host, "\t", ip)
@@ -32,7 +32,7 @@ class Interface:
         self.mac = params[3]
         self.lanname = params[4]
         
-    def print_interface(self):
+    def print_details(self):
         print("""[DEBUG] Interface details:
             name \t- {} 
             ip \t\t- {}
@@ -48,7 +48,7 @@ class RouteTable:
         self.nwmask = params[2]
         self.iface = params[3]
         
-    def print_routetable(self):
+    def print_details(self):
         print("""[DEBUG] Route table details:
             dest_ip \t- {}
             next_hop \t- {}
@@ -67,7 +67,7 @@ class DataFrame:
     def __init__(self):
         pass
     
-    def print_dataframe(self):
+    def print_details(self):
         print("""[DEBUG] DataFrame details:
             msg \t- {}
             src_ip \t- {}
