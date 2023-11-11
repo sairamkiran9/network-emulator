@@ -1,4 +1,5 @@
 #!/bin/csh -f
+killall xterm
 
 cd $PWD
 
@@ -12,7 +13,7 @@ sleep 1
 xterm -T "Host A" -e python3 station.py -no ifaces/ifaces.a rtables/rtable.a hosts &
 sleep 1
 xterm -T "Host B" -e python3 station.py -no ifaces/ifaces.b rtables/rtable.b hosts &
-sleep 1
+# sleep 1
 xterm -T "Host C" -e python3 station.py -no ifaces/ifaces.c rtables/rtable.c hosts &
 sleep 1
 xterm -T "Host D" -e python3 station.py -no ifaces/ifaces.d rtables/rtable.d hosts &
