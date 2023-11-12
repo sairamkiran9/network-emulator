@@ -1,7 +1,9 @@
 import os
 import time
 import pickle
+import threading
 from collections import defaultdict
+
 
 class Hosts:
     def __init__(self, filename):
@@ -18,7 +20,7 @@ class Hosts:
                 if len(parsed_line) == 2:
                     hosts[parsed_line[0]] = parsed_line[1]
         return hosts
-    
+
     def get_hosts(self):
         return self.hosts
 
@@ -27,6 +29,7 @@ class Hosts:
         for host, ip in self.hosts.items():
             print(host, "\t", ip)
         print()
+
 
 class Interface:
     def __init__(self, params):
@@ -53,6 +56,18 @@ class RouteTable:
         self.nwmask = params[2]
         self.iface = params[3]
 
+    def route(self, ip):
+        bin_ip = ''.join(format(int(x), '08b') for x in ip.split('.'))
+        bin_subnet = ''.join(format(int(x), '08b')
+                             for x in self.nwmask.split('.'))
+        bin_result = ''.join(str(int(a) & int(b))
+                             for a, b in zip(bin_ip, bin_subnet))
+        dec_result = '.'.join(
+            str(int(bin_result[i:i+8], 2)) for i in range(0, 32, 8))
+        if self.dest_ip == dec_result:
+            return self.next_hop
+        return ""
+
     def show(self):
         print("""[DEBUG] Route table details:
             dest_ip \t- {}
@@ -63,10 +78,12 @@ class RouteTable:
 
 
 class DataFrame:
-    def __init__(self, packet, src_mac, dest_mac):
+    def __init__(self, packet, src_ip, dest_ip, src_mac, dest_mac):
         self.packet = packet
+        self.src_ip = src_ip
+        self.dest_ip = dest_ip
         self.src_mac = src_mac
-        self.dest_mac = dest_mac        
+        self.dest_mac = dest_mac
 
     def show(self):
         print("""[DEBUG] DataFrame details:
@@ -78,30 +95,41 @@ class DataFrame:
             """.format(self.msg, self.dll_src_ip,
                        self.dll_src_mac, self.dll_dest_ip, self.dll_dest_mac))
 
+
 class ARP:
     def __init__(self, timeout=60):
         self.table = {}
         self.timeout = timeout
+        self.timer_thread = threading.Thread(
+            target=self.update_timer, daemon=True)
+        self.timer_thread.start()
+        self.lock = threading.Lock()
+        # self.timer_thread.join()
 
     def get(self, ip):
         entry = self.table.get(ip)
-        # if entry and time.time() - entry["timestamp"] <= self.timeout:
-        #     return entry["mac"]
-        # return ""
-        return entry
-    
+        if entry and entry["timestamp"] > 0:
+            return entry["mac"]
+        return ""
+
     def add_entry(self, ip, mac):
         self.table[ip] = {
             "mac": mac,
-            "timestamp": time.time()
+            "timestamp": 10
         }
-        
-    def remove_expired_entries(self):
-        curr_time = time.time()
-        expired_entries = [ip for ip, entry in self.table.items() if curr_time - entry["timestamp"] > self.timeout]
-        for ip in expired_entries:
-            del self.tabel[ip]
-        
+
+    def update_timer(self):
+        while True:
+            keys = []
+            for key in self.table:
+                if self.table[key]["timestamp"] > 0:
+                    self.table[key]["timestamp"] -= 1
+                else:
+                    keys.append(key)
+            time.sleep(1)
+            for ip in keys:
+                del self.table[ip]
+
     def request(self, src_ip, dest_ip, src_mac, dest_mac="FF:FF:FF:FF"):
         arp_request = {
             "type": "arp_request",
@@ -125,7 +153,10 @@ class ARP:
         return encrypted_frame
 
     def show(self):
-        print(self.table)
+        if self.table:
+            print(self.table)
+        else:
+            print({})
 
 
 class SL:
@@ -156,4 +187,3 @@ class IPpacket:
             src_ip \t- {}
             dest_ip \t- {}
             """.format(self.msg, self.src_ip, self.dest_ip))
-

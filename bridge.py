@@ -123,6 +123,5 @@ def main():
     bridge.inititalize()
     bridge.show()
 
-
 if __name__ == "__main__":
     main()

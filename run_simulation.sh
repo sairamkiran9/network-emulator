@@ -5,6 +5,7 @@ cd $PWD
 
 rm -rf ./symlinks/.*.addr
 rm -rf ./symlinks/.*.port
+
 sleep 1
 xterm -T "BRIDGE cs1" -iconic -e python3 bridge.py cs1 8 &
 xterm -T "BRIDGE cs2" -iconic -e python3 bridge.py cs2 8 &
