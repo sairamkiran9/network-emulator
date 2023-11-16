@@ -66,8 +66,8 @@ class RouteTable:
                              for a, b in zip(dest_ip, bin_subnet))
         next_prefix = '.'.join(
             str(int(bin_next_prefix[i:i+8], 2)) for i in range(0, 32, 8))
+        # print("----------", next_prefix, ip, self.nwmask)
         if self.dest_ip == next_prefix or next_prefix == "0.0.0.0":
-            print("##################")
             return self.next_hop
         return ""
 
@@ -198,6 +198,12 @@ class SL:
 class PQ:
     def __init__(self):
         self.table = defaultdict(list)
+        
+    def remove_entry(self, ip):
+        if ip in self.table:
+            self.table[ip].pop(0)
+            if self.table[ip] == []:
+                del self.table[ip]
 
     def show(self):
         print("pq => ", self.table)

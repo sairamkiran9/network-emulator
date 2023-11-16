@@ -57,7 +57,7 @@ class Bridge:
                         main_fdset.remove(r)
                         sock_vector.remove(r)
                     else:
-                        self.broadcast_msg(data, r, sock_vector)
+                        self.handle_frame(data, r, sock_vector)
 
         if len(sock_vector) > self.capacity:
             print("[ERROR] Bridge is full. All ports are occupied!")
@@ -74,7 +74,7 @@ class Bridge:
 
         print("[INFO] Created symlink for {}".format(self.name))
 
-    def broadcast_msg(self, data_frame, cur_fd, sock_vector):
+    def handle_frame(self, data_frame, cur_fd, sock_vector):
         deseriablised_msg = pickle.loads(data_frame)
         if deseriablised_msg["type"] == "arp_request":
             dest_mac = deseriablised_msg["dest_mac"]
