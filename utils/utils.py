@@ -1,3 +1,10 @@
+"""
+Utils.py: The main functionality of bridge
+Authors:
+- Sri Sai Ram Kiran Muppana
+- [potato]
+"""
+
 import os
 import time
 import pickle
@@ -6,23 +13,24 @@ from collections import defaultdict
 
 
 class Hosts:
+    hosts = {}
     def __init__(self, filename):
-        self.hosts = self.load_hosts(filename)
-        self.show()
+    #     self.hosts = self.load_hosts(filename)
+    #     self.show()
 
-    def load_hosts(self, filename):
-        hosts = {}
+    # def load_hosts(self, filename):
+    #     hosts = {}
         with open(filename) as file:
             lines = file.readlines()
             for line in lines:
                 parsed_line = [details for details in line.replace(
                     "\n", " ").replace("\t", " ").split(" ") if details != ""]
                 if len(parsed_line) == 2:
-                    hosts[parsed_line[0]] = parsed_line[1]
-        return hosts
+                    self.hosts[parsed_line[0]] = parsed_line[1]
+        # return hosts
 
-    def get_hosts(self):
-        return self.hosts
+    def get_hosts(self, name):
+        return self.hosts[name]
 
     def show(self):
         print("[DEBUG] Available hosts: ")
@@ -57,14 +65,15 @@ class RouteTable:
         self.iface = params[3]
 
     def route(self, ip):
-        bin_ip = ''.join(format(int(x), '08b') for x in ip.split('.'))
+        dest_ip = ''.join(format(int(x), '08b') for x in ip.split('.'))
         bin_subnet = ''.join(format(int(x), '08b')
                              for x in self.nwmask.split('.'))
-        bin_result = ''.join(str(int(a) & int(b))
-                             for a, b in zip(bin_ip, bin_subnet))
-        dec_result = '.'.join(
-            str(int(bin_result[i:i+8], 2)) for i in range(0, 32, 8))
-        if self.dest_ip == dec_result:
+        bin_next_prefix = ''.join(str(int(a) & int(b))
+                             for a, b in zip(dest_ip, bin_subnet))
+        next_prefix = '.'.join(
+            str(int(bin_next_prefix[i:i+8], 2)) for i in range(0, 32, 8))
+        if self.dest_ip == next_prefix or next_prefix == "0.0.0.0":
+            print("##################")
             return self.next_hop
         return ""
 
@@ -97,14 +106,11 @@ class DataFrame:
 
 
 class ARP:
-    def __init__(self, timeout=60):
+    def __init__(self):
         self.table = {}
-        self.timeout = timeout
         self.timer_thread = threading.Thread(
             target=self.update_timer, daemon=True)
         self.timer_thread.start()
-        self.lock = threading.Lock()
-        # self.timer_thread.join()
 
     def get(self, ip):
         entry = self.table.get(ip)
@@ -115,7 +121,7 @@ class ARP:
     def add_entry(self, ip, mac):
         self.table[ip] = {
             "mac": mac,
-            "timestamp": 10
+            "timestamp": 60
         }
 
     def update_timer(self):
@@ -162,6 +168,34 @@ class ARP:
 class SL:
     def __init__(self):
         self.table = {}
+        self.timer_thread = threading.Thread(
+            target=self.update_timer, daemon=True)
+        self.timer_thread.start()
+        
+    def get(self, mac):
+        entry = self.table.get(mac)
+        if entry and entry["timestamp"] > 0:
+            return entry["fd"]
+        return "" ## what if entry is removed from SL table?
+
+    def add_entry(self, mac, fd, port):
+        self.table[mac] = {
+            "fd": fd,
+            "port": port,
+            "timestamp": 60
+        }
+
+    def update_timer(self):
+        while True:
+            keys = []
+            for key in self.table:
+                if self.table[key]["timestamp"] > 0:
+                    self.table[key]["timestamp"] -= 1
+                else:
+                    keys.append(key)
+            time.sleep(1)
+            for ip in keys:
+                del self.table[ip]
 
     def show(self):
         print(self.table)
@@ -172,8 +206,17 @@ class PQ:
         self.table = defaultdict(list)
 
     def show(self):
-        print(self.table)
-
+        self.table = {
+            "128.34.56.78" : "msg",
+            "128.45.67.90" : "opop"
+        }
+        print("""
+*************************************************
+                pending queue
+*************************************************""")
+        for k,v in self.table.items():
+            print("\t {} : \t {}".format(k, v))
+        print("""*************************************************""")
 
 class IPpacket:
     def __init__(self, msg, src_ip, dest_ip):

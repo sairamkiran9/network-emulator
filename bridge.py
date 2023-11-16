@@ -1,9 +1,15 @@
-import os
+"""
+bridge.py: The main functionality of station and router
+Authors:
+- Sri Sai Ram Kiran Muppana
+- [potato]
+"""
+
 import sys
 import socket
 import select
 import pickle
-from utils.utils import Interface, RouteTable, DataFrame, ARP, SL
+from utils.utils import ARP, SL
 
 
 class Bridge:
@@ -80,14 +86,16 @@ class Bridge:
 
             elif deseriablised_msg["dest_ip"] == deseriablised_msg["src_ip"]:
                 print("[DEBUG] Sending arp request to myself.")
-                self.sl.table[src_mac] = cur_fd
+                src_port = sock_vector.index(cur_fd)
+                self.sl.add_entry(src_mac, cur_fd, src_port)
                 cur_fd.send(data_frame)
 
             else:
                 cur_port = sock_vector.index(cur_fd)
                 print("[INFO] Sending ARP Request to neighbours from port", cur_port)
-                self.sl.table[src_mac] = cur_fd
-                print(deseriablised_msg["src_ip"], deseriablised_msg["dest_ip"], "**\n")
+                self.sl.add_entry(src_mac, cur_fd, cur_port)
+                print(deseriablised_msg["src_ip"],
+                      deseriablised_msg["dest_ip"], "**\n")
                 for fd in sock_vector:
                     if cur_fd != fd:
                         fd.send(data_frame)
@@ -95,17 +103,17 @@ class Bridge:
         elif deseriablised_msg["type"] == "arp_reply":
             dest_mac = deseriablised_msg["dest_mac"]
             src_mac = deseriablised_msg["src_mac"]
-            self.sl.table[src_mac] = cur_fd
-            forward_fd = self.sl.table[dest_mac]
+            src_port = sock_vector.index(cur_fd)
+            self.sl.add_entry(src_mac, cur_fd, src_port)
+            forward_fd = self.sl.get(dest_mac)
             cur_port = sock_vector.index(forward_fd)
             print("[INFO] Got ARP Response, forwarding it to port ", cur_port)
             forward_fd.send(data_frame)
 
         elif deseriablised_msg["type"] == "dataframe":
-            print("[DEBUG] Self-Learning Table \n", self.sl.table.keys())
             df = pickle.loads(deseriablised_msg["data"])
             if df.dest_mac in self.sl.table:
-                station_fd = self.sl.table[df.dest_mac]
+                station_fd = self.sl.get(df.dest_mac)
                 station_fd.send(data_frame)
 
 
@@ -122,6 +130,7 @@ def main():
     bridge = Bridge(args)
     bridge.inititalize()
     bridge.show()
+
 
 if __name__ == "__main__":
     main()
