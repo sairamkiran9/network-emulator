@@ -54,11 +54,7 @@ class Station:
                 
         return ip
 
-    def init_arp_request(self, encapsulated_packet, src_ip, src_mac, dest_ip, fd):
-        print("[DEBUG] Entry not in ARP cache. Initialising ARP request.")
-        next_hop = self.get_nexthop(dest_ip)
-        print("[DEBUG] Going for next hop", next_hop)
-        self.pq.table[next_hop].append(encapsulated_packet)
+    def init_arp_request(self, encapsulated_packet, src_ip, src_mac, next_hop, fd):
         arp_request = self.arp.request(src_ip, next_hop, src_mac)
         print("[DEBUG] Sending arp request of size {} bytes through {}".format(
             len(arp_request), self.fd2iface[fd]))
@@ -128,8 +124,8 @@ class Station:
                         print("[DEBUG] Received arp response of size {} bytes from {}".format(
                             len(data), dest_ip))
                         self.arp.add_entry(dest_ip, dest_mac)
-                        print("[DEBUG] Cuurent pending queue entries ", self.pq.table)
-                        print("\n\n")
+                        # print("[DEBUG] Cuurent pending queue entries ", self.pq.table.keys())
+                        # print("\n\n")
                         if dest_ip in self.pq.table:
                             packets = self.pq.table[dest_ip]
                             for packet in packets:
@@ -139,8 +135,10 @@ class Station:
                                 serialised_frame = pickle.dumps(
                                     {"type": "dataframe", "data": encrypted_df})
                                 print("[DEBUG] Sending dataframe to ", dest_ip)
-                                r.send(serialised_frame)
+                                print("len of pq before: ", len(self.pq.table[dest_ip]))
                                 self.pq.table[dest_ip].pop(0)
+                                r.send(serialised_frame)
+                                print("len of pq after: ", len(self.pq.table[dest_ip]))
                         else:
                             print(
                                 "[DEBUG] Got ARP response but pending queue is empty. Nothing to forward.")
@@ -158,10 +156,14 @@ class Station:
                             else:
                                 self.arp.add_entry(
                                     self.iface[cur_iface].ip, data_frame.dest_mac)
-                                print("pending queue ", self.pq.table.keys())
-                                for key in self.ip2fd.keys():
-                                    self.init_arp_request(
-                                        data_frame.packet, self.iface[cur_iface].ip, self.iface[cur_iface].mac, ip_packet.dest_ip, self.ip2fd[key])
+                                print("[DEBUG] Entry not in ARP cache. Initialising ARP request.")
+                                next_hop = self.get_nexthop(ip_packet.dest_ip)
+                                print("[DEBUG] Going for next hop", next_hop)
+                                self.pq.table[next_hop].append(data_frame.packet)
+                                print("pending queue in dataframe ", self.pq.table.keys())
+                                # for key in self.ip2fd.keys():
+                                self.init_arp_request(
+                                    data_frame.packet, self.iface[cur_iface].ip, self.iface[cur_iface].mac, ip_packet.dest_ip, r)
 
                 elif r == sys.stdin:
                     msg = sys.stdin.readline()
@@ -195,8 +197,12 @@ class Station:
                                     self.pq.table["dest_ip"].pop(0) # need to change this because packet always can't be at the start
                                 fd.send(serialised_frame)
                             else:
+                                print("[DEBUG] Entry not in ARP cache. Initialising ARP request.")
+                                next_hop = self.get_nexthop(dest_ip)
+                                print("[DEBUG] Next hop address", next_hop)
+                                self.pq.table[next_hop].append(encapsulated_packet)
                                 self.init_arp_request(
-                                    encapsulated_packet, src_ip, src_mac, dest_ip, fd)
+                                    encapsulated_packet, src_ip, src_mac, next_hop, fd)
 
                     elif msg_args[0] == "show":
                         cmd = msg_args[1].replace("\n", "")

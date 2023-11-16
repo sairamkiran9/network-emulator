@@ -5,7 +5,7 @@ Authors:
 - [potato]
 """
 
-import os
+import json
 import time
 import pickle
 import threading
@@ -15,11 +15,6 @@ from collections import defaultdict
 class Hosts:
     hosts = {}
     def __init__(self, filename):
-    #     self.hosts = self.load_hosts(filename)
-    #     self.show()
-
-    # def load_hosts(self, filename):
-    #     hosts = {}
         with open(filename) as file:
             lines = file.readlines()
             for line in lines:
@@ -27,7 +22,6 @@ class Hosts:
                     "\n", " ").replace("\t", " ").split(" ") if details != ""]
                 if len(parsed_line) == 2:
                     self.hosts[parsed_line[0]] = parsed_line[1]
-        # return hosts
 
     def get_hosts(self, name):
         return self.hosts[name]
@@ -206,10 +200,7 @@ class PQ:
         self.table = defaultdict(list)
 
     def show(self):
-        self.table = {
-            "128.34.56.78" : "msg",
-            "128.45.67.90" : "opop"
-        }
+        print("pq => ", self.table)
         print("""
 *************************************************
                 pending queue
