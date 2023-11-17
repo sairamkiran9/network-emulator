@@ -66,7 +66,6 @@ class RouteTable:
                              for a, b in zip(dest_ip, bin_subnet))
         next_prefix = '.'.join(
             str(int(bin_next_prefix[i:i+8], 2)) for i in range(0, 32, 8))
-        # print("----------", next_prefix, ip, self.nwmask)
         if self.dest_ip == next_prefix or next_prefix == "0.0.0.0":
             return self.next_hop
         return ""
@@ -128,6 +127,7 @@ class ARP:
                     keys.append(key)
             time.sleep(1)
             for ip in keys:
+                print("[DEBUG] One entry in arp cache timed out")
                 del self.table[ip]
 
     def request(self, src_ip, dest_ip, src_mac, dest_mac="FF:FF:FF:FF"):
@@ -192,7 +192,15 @@ class SL:
                 del self.table[ip]
 
     def show(self):
-        print(self.table)
+        print("sl=> ",self.table)
+        print("""
+*************************************************
+                Self Learning Table
+*************************************************""")
+        for k,v in self.table.items():
+            if v != []:
+                print("\t {} : \t {}".format(k, v))
+        print("""*************************************************""")
 
 
 class PQ:
@@ -212,7 +220,8 @@ class PQ:
                 pending queue
 *************************************************""")
         for k,v in self.table.items():
-            print("\t {} : \t {}".format(k, v))
+            if v != []:
+                print("\t {} : \t {}".format(k, v))
         print("""*************************************************""")
 
 class IPpacket:

@@ -5,7 +5,9 @@ Authors:
 - [potato]
 """
 
+import os
 import sys
+import time
 import socket
 import select
 import pickle
@@ -27,17 +29,27 @@ class Station:
         self.hosts.show()
 
     def get_landetails(self, lanname):
+        if not os.path.exists("./symlinks/.{}.addr".format(lanname)):
+            print("[ERROR] Bidge details missing")
+            raise Exception
         with open("./symlinks/.{}.addr".format(lanname)) as file:
             ip = file.read()
         with open("./symlinks/.{}.port".format(lanname)) as file:
             port = file.read()
         return ip, port
-
-    # def get_key(self, val, data):
-    #     for key, value in data.items():
-    #         if val == value:
-    #             return key
-    #     return None
+    
+    def check_connection(self, sockfd, ntries): 
+        print("[DEBUG] Checking new connection to bridge...")
+        sockfd.send("HI, I'm a station".encode())
+        time.sleep(3)
+        accept_signal = sockfd.recv(4096)
+        if accept_signal:
+            print("[INFO] Bridge accepted my connection request.")
+            return True
+        else:
+            print("[ERROR] Station connecting to bridge failed. Number of tries = ", ntries+1)
+            return False
+        return False
 
     def get_nexthop(self, ip, cur_iface):
         print("[DEBUG] Calculating next hop")
@@ -45,7 +57,6 @@ class Station:
         for rtable in self.rtable:
             next_hop = rtable.route(ip)
             if next_hop != "" and next_hop != "0.0.0.0":
-                # print("######", next_hop)
                 return next_hop, rtable.iface
             if next_hop == "0.0.0.0":
                 print("[DEBU] Returning dest ip since next hop is 0.0.0.0")
@@ -54,8 +65,7 @@ class Station:
             for rtable in self.rtable:
                 if rtable.dest_ip == "0.0.0.0":
                     print("[INFO] Default gateway router")
-                    return rtable.next_hop, rtable.iface  
-        # print("#######",next_hop, "++", ip,"--", cur_iface) 
+                    return rtable.next_hop, rtable.iface
         return ip, cur_iface
 
     def init_arp_request(self, encapsulated_packet, src_ip, src_mac, next_hop, fd):
@@ -69,31 +79,40 @@ class Station:
         client_set.add(sys.stdin)
 
         for iface_name in self.iface:
+            ntries = 0
+            sockfd = None
             print("[INFO] Initializing interface ", iface_name)
             cur_iface = self.iface[iface_name]
-            bridge_ip, port = self.get_landetails(cur_iface.lanname)
-
-            hints = socket.getaddrinfo(
-                bridge_ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-            for addr in hints:
+            while (ntries < 5 and sockfd == None):
                 try:
+                    bridge_ip, port = self.get_landetails(cur_iface.lanname)
+                    hints = socket.getaddrinfo(
+                        bridge_ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                    addr = hints[0]
                     sockfd = socket.socket(addr[0], addr[1], addr[2])
-                    station_ip = self.hosts.get_hosts(iface_name)
-                    print("station => ", iface_name, station_ip)
                     sockfd.connect(addr[4])
-                    self.iface2fd[iface_name] = sockfd
-                    self.fd2iface[sockfd] = iface_name
-                    self.ip2fd[station_ip] = sockfd
-                    break
+                    if self.check_connection(sockfd, ntries):
+                        station_ip = self.hosts.get_hosts(iface_name)
+                        print("My details => ", iface_name, station_ip)
+                        self.iface2fd[iface_name] = sockfd
+                        self.fd2iface[sockfd] = iface_name
+                        self.ip2fd[station_ip] = sockfd
+                        break
+                    else:
+                        ntries += 1
+                        sockfd = None
                 except socket.error:
                     if sockfd:
                         sockfd.close()
+                    print(
+                        "[ERROR] Station connecting to bridge failed. Number of tries = ", ntries+1)
+                    ntries += 1
                     sockfd = None
 
             if sockfd is None:
-                print("[ERROR] Cannot connect. Bridge rejected")
+                print("[ERROR] Cannot connect. Bridge rejected station connection request {} times".format(ntries))
                 sys.exit(0)
-
+                     
             addr_info = sockfd.getsockname()
             ipstr = addr_info[0]
             port = addr_info[1]
@@ -106,23 +125,22 @@ class Station:
             for r in temp_set:
                 if r in client_set and r != sys.stdin:
                     response = r.recv(4096)
-
                     if not response:
                         print("Bridge disconnected.")
                         sys.exit(0)
 
                     cur_iface = self.fd2iface[r]
                     data = pickle.loads(response)
-                    # print("*********", data["type"])
-                    if data["type"] == "arp_request":
-                        if data["dest_ip"] == self.hosts.get_hosts(cur_iface):
-                            print(
-                                "[DEBUG] It's My IP sending back ARP response.")
-                            data["dest_mac"] = self.iface[cur_iface].mac
-                            arp_reply = self.arp.reply(data)
-                            r.send(arp_reply)
+                    if data["type"] == "arp_request" and data["dest_ip"] == self.hosts.get_hosts(cur_iface):
+                        print("[DEBUG] It's My IP sending back ARP response.")
+                        data["dest_mac"] = self.iface[cur_iface].mac
+                        # self.pq.table[data["src_ip"]].append(data["src_mac"])
+                        self.arp.add_entry(data["src_ip"], data["src_mac"])
+                        arp_reply = self.arp.reply(data)
+                        r.send(arp_reply)
 
                     elif data["type"] == "arp_reply":
+                        print(data)
                         src_ip, src_mac, dest_ip, dest_mac = data["dest_ip"], data[
                             "dest_mac"], data["src_ip"], data["src_mac"]
                         print("[DEBUG] Received arp response of size {} bytes from {}".format(
@@ -137,34 +155,34 @@ class Station:
                                 serialised_frame = pickle.dumps(
                                     {"type": "dataframe", "data": encrypted_df})
                                 print("[DEBUG] Sending dataframe to ", dest_ip)
-                                # print("len of pq before: ", len(self.pq.table[dest_ip]))
                                 self.pq.remove_entry(dest_ip)
                                 r.send(serialised_frame)
-                                # print("len of pq after: ", len(self.pq.table[dest_ip]))
+                                print("sent")
                         else:
                             print(
                                 "[DEBUG] Got ARP response but pending queue is empty. Nothing to forward.")
 
                     elif data["type"] == "dataframe":
+                        print("[INFO] Received frame of size {} bytes".format(
+                                    len(data["data"])))
                         data_frame = pickle.loads(data["data"])
                         if data_frame.dest_mac == self.iface[cur_iface].mac:
                             ip_packet = pickle.loads(data_frame.packet)
-                            if ip_packet.dest_ip == self.iface[cur_iface].ip:
-                                print("[INFO] Received frame of size {} bytes".format(
-                                    len(data["data"])))
+                            if ip_packet.dest_ip == self.iface[cur_iface].ip:    
                                 ip_packet.show()
                                 print("{} >> {}".format(
                                     cur_iface, ip_packet.msg))
-                            else:       
-                                print("current details",ip_packet.dest_ip, cur_iface )
-                                next_hop, next_iface = self.get_nexthop(ip_packet.dest_ip, cur_iface)
+                            else:
+                                print("current details",
+                                      ip_packet.dest_ip, cur_iface)
+                                next_hop, next_iface = self.get_nexthop(
+                                    ip_packet.dest_ip, cur_iface)
                                 print("[DEBUG] Next hop ip ", next_hop)
                                 print("[DEBUG] Next hop interface", next_iface)
-                                self.pq.table[next_hop].append(data_frame.packet)
-                                print("pending queue in dataframe ", self.pq.table.keys())
-                                self.arp.add_entry(
-                                    self.iface[next_iface].ip, data_frame.dest_mac)
-                                print("[DEBUG] Entry not in ARP cache. Initialising ARP request.")
+                                self.pq.table[next_hop].append(
+                                    data_frame.packet)
+                                print(
+                                    "[DEBUG] Entry not in ARP cache. Initialising ARP request.")
                                 self.init_arp_request(
                                     data_frame.packet, self.iface[cur_iface].ip, self.iface[cur_iface].mac, next_hop, self.iface2fd[next_iface])
 
@@ -178,7 +196,8 @@ class Station:
                         dest_host = msg.split(" ")[1]
                         if dest_host not in self.hosts.hosts:
                             print("[ERROR] Unrecognised host.",
-                                  dest_host, " not in DNS")
+                                  dest_host.replace("\n", ""), " not in DNS")
+                            break
                         dest_ip = self.hosts.get_hosts(dest_host)
                         next_hop, src_name = self.get_nexthop(dest_ip, "")
                         print("[DEBUG] Dest ip", dest_ip)
@@ -205,7 +224,8 @@ class Station:
                             #     self.pq.table["dest_ip"].pop(0) # need to change this because packet always can't be at the start
                             fd.send(serialised_frame)
                         else:
-                            print("[DEBUG] Entry not in ARP cache. Initialising ARP request.")                            
+                            print(
+                                "[DEBUG] Entry not in ARP cache. Initialising ARP request.")
                             self.pq.table[next_hop].append(encapsulated_packet)
                             self.init_arp_request(
                                 encapsulated_packet, src_ip, src_mac, next_hop, fd)
