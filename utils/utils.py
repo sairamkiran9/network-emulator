@@ -5,7 +5,6 @@ Authors:
 - [potato]
 """
 
-import json
 import time
 import pickle
 import threading
@@ -27,9 +26,15 @@ class Hosts:
         return self.hosts[name]
 
     def show(self):
-        print("[DEBUG] Available hosts: ")
+        print("+-----------------------------------+")
+        print("|            DNS TABLE              |")
+        print("+-----------------------------------+")
+        print("|    HOSTNAME     |    IP Address   |")
+        print("+-----------------------------------+")
+
         for host, ip in self.hosts.items():
-            print(host, "\t", ip)
+            print("| {:^15} | {:^15} |".format(host, ip))
+        print("+-----------------------------------+")
         print()
 
 
@@ -192,15 +197,16 @@ class SL:
                 del self.table[ip]
 
     def show(self):
-        print("sl=> ",self.table)
-        print("""
-*************************************************
-                Self Learning Table
-*************************************************""")
-        for k,v in self.table.items():
-            if v != []:
-                print("\t {} : \t {}".format(k, v))
-        print("""*************************************************""")
+        print("+-------------------------------------------+")
+        print("|             SELF LEARNING TABLE           |")
+        print("+-------------------------------------------+")
+        print("|    MAC ADDRESS    |  PORT  |  FD  |  TTL  |")
+        print("+-------------------------------------------+")
+
+        for ip, value in self.sl.table.items():
+            print("| {:^17} | {:^6} | {:^4} | {:^5} |".format(ip, value["port"], value["fd"], value["timestamp"]))
+        print("+-------------------------------------------+")
+        print()
 
 
 class PQ:
@@ -214,15 +220,15 @@ class PQ:
                 del self.table[ip]
 
     def show(self):
-        print("pq => ", self.table)
-        print("""
-*************************************************
-                pending queue
-*************************************************""")
-        for k,v in self.table.items():
-            if v != []:
-                print("\t {} : \t {}".format(k, v))
-        print("""*************************************************""")
+        print("+-------------------------------------+")
+        print("|           PENDING QUEUE             |")
+        print("+-------------------------------------+")
+        print("|       DEST IP      | # PKTS Waiting |")
+        print("+-------------------------------------+")
+        for ip, value in self.pq.items():
+            print("| {:^20} | {:^20} |".format(ip, len(value)))
+        print("+-------------------------------------+")
+        print()
 
 class IPpacket:
     def __init__(self, msg, src_ip, dest_ip):
@@ -231,8 +237,11 @@ class IPpacket:
         self.dest_ip = dest_ip
 
     def show(self):
-        print("""[DEBUG] Packet details:
-            msg \t- {}
-            src_ip \t- {}
-            dest_ip \t- {}
-            """.format(self.msg, self.src_ip, self.dest_ip))
+        print("+---------------------------------------------------------+")
+        print("|                        IP PACKET                        |")
+        print("+---------------------------------------------------------+")
+        print("|     MESSAGE     |       SRC IP      |      DEST IP      |")
+        print("+---------------------------------------------------------+")
+        print("| {:^15} | {:^17} | {:^17} |".format(self.msg, self.src_ip, self.dest_ip))
+        print("+---------------------------------------------------------+")
+        print()

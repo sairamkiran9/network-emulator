@@ -21,6 +21,7 @@ class Bridge:
         self.host_port = -1
         self.sl = SL()
         self.arp = ARP()
+        self.sock_vector = []
 
     def check_connection(self, sockfd, nconn):
         time.sleep(2)
@@ -50,11 +51,11 @@ class Bridge:
         self.create_symlink()
 
         main_fdset = set([sys.stdin, sockfd])
-        sock_vector = []
+        # self.sock_vector = []
         while 1:
             new_fdset, _, _ = select.select(main_fdset, [], [])
             for r in new_fdset:
-                nconnections = len(sock_vector)
+                nconnections = len(self.sock_vector)
                 if r == sys.stdin:
                     msg = sys.stdin.readline()
                     if not msg:
@@ -74,7 +75,7 @@ class Bridge:
                         addr_info = new_conn_sockfd.getpeername()
                         print("[INFO] Bridge: connect from '{}' {}:{}".format(
                             self.host_ip, addr_info[0], addr_info[1]))
-                        sock_vector.append(new_conn_sockfd)
+                        self.sock_vector.append(new_conn_sockfd)
                         main_fdset.add(new_conn_sockfd)
                     except socket.error as e:
                         print(f"Error accepting connection: {e}")
@@ -87,9 +88,9 @@ class Bridge:
                             addr_info[0], addr_info[1]))
                         r.close()
                         main_fdset.remove(r)
-                        sock_vector.remove(r)
+                        self.sock_vector.remove(r)
                     else:
-                        self.handle_frame(data, r, sock_vector)
+                        self.handle_frame(data, r)
         return True
 
     def create_symlink(self):
@@ -104,19 +105,17 @@ class Bridge:
 
         print("[INFO] Created symlink for {}".format(self.name))
 
-    def handle_frame(self, data_frame, cur_fd, sock_vector):
+    def handle_frame(self, data_frame, cur_fd):
         frame = pickle.loads(data_frame)
-        # packet = pickle.loads(data_frame["data"])
-        cur_port = sock_vector.index(cur_fd)
-        # print(frame)
-        # self.sl.add_entry(frame["src_mac"], cur_fd, cur_port)
+        cur_port = self.sock_vector.index(cur_fd)
         if frame["type"] == "arp_request":
             dest_mac = frame["dest_mac"]
             src_mac = frame["src_mac"]
             if dest_mac in self.sl.table:
                 print("[INFO] Entry in SL table")
                 arp_reply = self.arp.reply(frame)
-                cur_fd.send(arp_reply)
+                forward_fd = self.sl.get(dest_mac)
+                forward_fd.send(arp_reply)
 
             elif frame["dest_ip"] == frame["src_ip"]:
                 print("[DEBUG] Sending arp reply to same port.")
@@ -126,22 +125,22 @@ class Bridge:
                 cur_fd.send(arp_reply)
 
             else:
-                cur_port = sock_vector.index(cur_fd)
+                cur_port = self.sock_vector.index(cur_fd)
                 print("[INFO] Sending ARP Request to neighbours from port", cur_port)
                 self.sl.add_entry(src_mac, cur_fd, cur_port)
                 print(frame["src_ip"],
                       frame["dest_ip"], "**\n")
-                for fd in sock_vector:
+                for fd in self.sock_vector:
                     if cur_fd != fd:
                         fd.send(data_frame)
 
         elif frame["type"] == "arp_reply":
             dest_mac = frame["dest_mac"]
             src_mac = frame["src_mac"]
-            src_port = sock_vector.index(cur_fd)
+            src_port = self.sock_vector.index(cur_fd)
             self.sl.add_entry(src_mac, cur_fd, src_port)
             forward_fd = self.sl.get(dest_mac)
-            cur_port = sock_vector.index(forward_fd)
+            cur_port = self.sock_vector.index(forward_fd)
             print("[INFO] Got ARP Response, forwarding it to port ", cur_port)
             forward_fd.send(data_frame)
 
@@ -150,6 +149,11 @@ class Bridge:
             if df.dest_mac in self.sl.table:
                 station_fd = self.sl.get(df.dest_mac)
                 station_fd.send(data_frame)
+            else:
+                print("[INFO] Entry not in SL table. Broadcasting the message.")
+                for fd in self.sock_vector:
+                    if fd != cur_fd:
+                        fd.send(data_frame)
 
 
 def load_args():
