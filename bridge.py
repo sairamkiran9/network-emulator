@@ -10,7 +10,8 @@ import time
 import socket
 import select
 import pickle
-from utils.utils import ARP, SL
+from utils.sl import SL
+from utils.arp import ARP
 
 
 class Bridge:
@@ -24,16 +25,15 @@ class Bridge:
         self.sock_vector = []
 
     def check_connection(self, sockfd, nconn):
-        time.sleep(2)
-        accept_signal = sockfd.recv(4096)
-        if accept_signal and self.capacity > nconn:
+        if self.capacity > nconn:
             print(
                 "[INFO] I accepted connection request from station at fd .", sockfd.fileno())
-            sockfd.send("Accepted connection".encode())
+            sockfd.send("accept".encode())
             return True
         elif self.capacity <= nconn:
             print(
                 "[ERROR] New connectin rejected because i'm full and all my ports are occupied!")
+            sockfd.send("reject".encode())
             sockfd.close()
             return False
 
@@ -51,7 +51,6 @@ class Bridge:
         self.create_symlink()
 
         main_fdset = set([sys.stdin, sockfd])
-        # self.sock_vector = []
         while 1:
             new_fdset, _, _ = select.select(main_fdset, [], [])
             for r in new_fdset:
@@ -61,7 +60,6 @@ class Bridge:
                     if not msg:
                         sys.exit(0)
                     msg_args = msg.split(" ", 1)
-                    print(msg_args)
                     if msg_args[0] == "show":
                         if msg_args[1].replace("\n", "") == "sl":
                             self.sl.show()
@@ -70,13 +68,12 @@ class Bridge:
                 elif r == sockfd:
                     try:
                         new_conn_sockfd, new_conn_addr = sockfd.accept()
-                        if not self.check_connection(new_conn_sockfd, nconnections):
-                            break
-                        addr_info = new_conn_sockfd.getpeername()
-                        print("[INFO] Bridge: connect from '{}' {}:{}".format(
-                            self.host_ip, addr_info[0], addr_info[1]))
-                        self.sock_vector.append(new_conn_sockfd)
-                        main_fdset.add(new_conn_sockfd)
+                        if self.check_connection(new_conn_sockfd, nconnections):
+                            addr_info = new_conn_sockfd.getpeername()
+                            print("[INFO] Bridge: connect from '{}' {}:{}".format(
+                                self.host_ip, addr_info[0], addr_info[1]))
+                            self.sock_vector.append(new_conn_sockfd)
+                            main_fdset.add(new_conn_sockfd)
                     except socket.error as e:
                         print(f"Error accepting connection: {e}")
                         break
@@ -148,7 +145,10 @@ class Bridge:
             df = pickle.loads(frame["data"])
             if df.dest_mac in self.sl.table:
                 station_fd = self.sl.get(df.dest_mac)
-                station_fd.send(data_frame)
+                if station_fd in self.sock_vector:
+                    station_fd.send(data_frame)
+                else:
+                    print("[DEBUG] I think station with this {} disconnected")
             else:
                 print("[INFO] Entry not in SL table. Broadcasting the message.")
                 for fd in self.sock_vector:
