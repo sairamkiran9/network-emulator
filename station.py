@@ -32,7 +32,7 @@ class Station:
         self.name = list(self.iface.keys())
         self.hosts = Hosts(params[4])
         self.display()
-        
+
     def display(self):
         Interface.show_ifaces(self.iface)
         RouteTable.show_rtables(self.rtable)
@@ -136,6 +136,8 @@ class Station:
 
             if len(client_set) == len(self.iface)+1:
                 break
+            del ifaces[iface_name]
+            time.sleep(2)
 
         if len(client_set) != len(self.iface)+1:
             sys.exit(0)
@@ -151,8 +153,10 @@ class Station:
                     if not response:
                         print("Bridge disconnected.")
                         sys.exit(0)
-
                     cur_iface = self.fd2iface[r]
+                    header = "\nStation: {}>".format(
+                        cur_iface) if not self.isroute else "\nRouter: {}>".format(cur_iface)
+                    print(header)
                     data = pickle.loads(response)
                     if data["type"] == "arp_request":
                         if data["dest_ip"] == self.hosts.get_hosts(cur_iface):
@@ -162,7 +166,8 @@ class Station:
                             arp_reply = self.arp.reply(data)
                             r.send(arp_reply)
                         else:
-                            print("[DEBUG] Received ARP request. This IP packet is not for me")
+                            print(
+                                "[DEBUG] Received ARP request. This IP packet is not for me")
 
                     elif data["type"] == "arp_reply":
                         src_ip, src_mac, dest_ip, dest_mac = data["dest_ip"], data[
@@ -194,6 +199,8 @@ class Station:
                             ip_packet = pickle.loads(data_frame.packet)
                             if ip_packet.dest_ip == self.iface[cur_iface].ip and not self.isroute:
                                 ip_packet.show()
+                                print("This IP packet is received from station {}".format(
+                                    self.fd2iface[self.ip2fd[ip_packet.dest_ip]]))
                                 print("{} >> {}".format(
                                     cur_iface, ip_packet.msg))
                             else:

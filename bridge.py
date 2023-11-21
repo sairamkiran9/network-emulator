@@ -53,6 +53,7 @@ class Bridge:
         main_fdset = set([sys.stdin, sockfd])
         while 1:
             new_fdset, _, _ = select.select(main_fdset, [], [])
+            print("\n")
             for r in new_fdset:
                 nconnections = len(self.sock_vector)
                 if r == sys.stdin:
@@ -110,16 +111,16 @@ class Bridge:
             src_mac = frame["src_mac"]
             if dest_mac in self.sl.table:
                 print("[INFO] Entry in SL table")
-                arp_reply = self.arp.reply(frame)
+                # arp_reply = self.arp.reply(frame)
                 forward_fd = self.sl.get(dest_mac)
-                forward_fd.send(arp_reply)
+                forward_fd.send(data_frame)
 
-            elif frame["dest_ip"] == frame["src_ip"]:
-                print("[DEBUG] Sending arp reply to same port.")
-                self.sl.add_entry(src_mac, cur_fd, cur_port)
-                frame["dest_mac"] = frame["src_mac"]
-                arp_reply = self.arp.reply(frame)
-                cur_fd.send(arp_reply)
+            # elif frame["dest_ip"] == frame["src_ip"]:
+            #     print("[DEBUG] Sending arp reply to same port.")
+            #     self.sl.add_entry(src_mac, cur_fd, cur_port)
+            #     frame["dest_mac"] = frame["src_mac"]
+            #     arp_reply = self.arp.reply(frame)
+            #     cur_fd.send(arp_reply)
 
             else:
                 cur_port = self.sock_vector.index(cur_fd)
