@@ -11,9 +11,9 @@ class PQ:
     def __init__(self):
         self.table = defaultdict(list)
 
-    def remove_entry(self, ip):
+    def remove_entry(self, ip, packet):
         if ip in self.table:
-            self.table[ip].pop(0)
+            self.table[ip].remove(packet)
             if self.table[ip] == []:
                 del self.table[ip]
 

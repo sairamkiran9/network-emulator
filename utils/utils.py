@@ -23,16 +23,16 @@ class Interface:
             """.format(self.name, self.ip, self.nwmask, self.mac, self.lanname))
       
     def show_ifaces(interfaces):
-        print("+-------------------------------------------------------------------+")
-        print("|                        Interface Table                            |")
-        print("+-------------------------------------------------------------------+")
-        print("|  Name  |   ip address   |     nwmask     |    mac address    | lan name |")
-        print("+-------------------------------------------------------------------+")
+        print("+---------------------------------------------------------------------------+")
+        print("|                             Interface Table                               |")
+        print("+---------------------------------------------------------------------------+")
+        print("|  Name  |    ip address   |      nwmask     |    mac address    | lan name |")
+        print("+---------------------------------------------------------------------------+")
 
         for iface, value in interfaces.items():
-            print("| {:<6} | {:<14} | {:<14} | {:<17} | {:<8} |".format(
+            print("| {:<6} | {:<15} | {:<15} | {:<17} | {:<8} |".format(
                 value.name, value.ip, value.nwmask, value.mac, value.lanname))
-        print("+-------------------------------------------------------------------+")
+        print("+---------------------------------------------------------------------------+")
         print()
         
 

@@ -48,19 +48,18 @@ class Station:
             port = file.read()
         return ip, port
 
-    def check_connection(self, sockfd, ntries):
-        print("[{}][DEBUG] Checking new connection to bridge...".format(
-            ntries))
-        # time.sleep(3)
+    def check_connection(self, sockfd, iface):
+        print("[DEBUG] Checking new connection to bridge...")
         accept_signal = sockfd.recv(4096)
         status = accept_signal.decode()
         if status == "accept":
-            print("[{}][INFO] Bridge accepted my connection request.".format(
-                ntries))
+            message = "[{}][INFO] Bridge accepted my connection request".format(iface)
+            separator = '-' * (len(message)+4)
+            print("\n{}\n| {} |\n{}\n".format(separator, message, separator))
             return True
         else:
             print(
-                "[{}][ERROR] Bridge rejected my connection request.".format(ntries))
+                "[{}][ERROR] Bridge rejected my connection request".format(iface))
             return False
 
     def get_nexthop(self, ip, cur_iface):
@@ -87,71 +86,72 @@ class Station:
         fd.send(arp_request)
 
     def connect_bridge(self):
-        client_set = set()
-        client_set.add(sys.stdin)
+        station_set = set()
+        station_set.add(sys.stdin)
 
-        ifaces = self.iface
+        # ifaces = []
         ntries = 0
         status = False
         while ntries < 5:
             ntries += 1
-            for iface_name in ifaces:
-                try:
-                    sockfd = None
-                    status = False
-                    print("[INFO] Initializing interface ", iface_name)
-                    cur_iface = self.iface[iface_name]
-                    bridge_ip, port = self.get_landetails(cur_iface.lanname)
-                    hints = socket.getaddrinfo(
-                        bridge_ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-                    addr = hints[0]
-                    sockfd = socket.socket(addr[0], addr[1], addr[2])
-                    sockfd.setblocking(0)
-                    sockfd.settimeout(2)
-
-                    _, writable, _ = select.select([], [sockfd], [], 2)
-                    if sockfd in writable:
-                        sockfd.connect(addr[4])
-                        status = self.check_connection(sockfd, iface_name)
+            for iface_name in self.iface:
+                if iface_name not in self.iface2fd:
+                    try:
+                        sockfd = None
+                        status = False
+                        print("[INFO] Initializing interface ", iface_name)
+                        cur_iface = self.iface[iface_name]
+                        bridge_ip, port = self.get_landetails(cur_iface.lanname)
+                        hints = socket.getaddrinfo(
+                            bridge_ip, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                        addr = hints[0]
+                        sockfd = socket.socket(addr[0], addr[1], addr[2])
+                        sockfd.setblocking(0)
+                        sockfd.settimeout(2)
+                        sockfd.connect(addr[4]) 
+                        temp_set, _, _ = select.select([sockfd],[],[])
+                        for sockfd in temp_set:
+                            status = self.check_connection(sockfd, iface_name)         
+                            if status:
+                                station_set.add(sockfd)
+                                station_ip = self.hosts.get_hosts(iface_name)
+                                self.iface2fd[iface_name] = sockfd
+                                self.fd2iface[sockfd] = iface_name
+                                self.ip2fd[station_ip] = sockfd
+                            else:
+                                sockfd.close()
                         sockfd.setblocking(1)
-                        if status:
-                            client_set.add(sockfd)
-                            station_ip = self.hosts.get_hosts(iface_name)
-                            self.iface2fd[iface_name] = sockfd
-                            self.fd2iface[sockfd] = iface_name
-                            self.ip2fd[station_ip] = sockfd
-                        else:
+                    except socket.error as e:
+                        if sockfd:
                             sockfd.close()
-                except socket.error as e:
-                    if sockfd:
-                        sockfd.close()
-                    if e.errno == socket.errno.EINPROGRESS:
-                        pass
-                    else:
-                        print(
-                            "[{}][ERROR] Station connecting to bridge failed. Number of tries = {}".format(iface_name, ntries))
-                except Exception as e:
-                    print("[{}][ERROR] Bridge not intialised. Number of tries = {}".format(
-                        iface_name, ntries))
+                        if e.errno == socket.errno.EINPROGRESS:
+                            pass
+                        else:
+                            print(
+                                "[{}][ERROR] Station connecting to bridge failed. Number of tries = {}".format(iface_name, ntries))
+                    except Exception as e:
+                        print(e)
+                        print("[{}][ERROR] Bridge not intialised. Number of tries = {}".format(
+                            iface_name, ntries))
 
-            if len(client_set) == len(self.iface)+1:
+            if len(station_set) == len(self.iface)+1:
                 break
-            del ifaces[iface_name]
             time.sleep(2)
 
-        if len(client_set) != len(self.iface)+1:
+        if len(station_set) != len(self.iface)+1:
             sys.exit(0)
-        return client_set
+        return station_set
 
     def initialize(self):
-        client_set = self.connect_bridge()
+        station_set = self.connect_bridge()
         while True:
-            temp_set, _, _ = select.select(client_set, [], [])
+            temp_set, _, _ = select.select(station_set, [], [])
             for r in temp_set:
-                if r in client_set and r != sys.stdin:
+                if r in station_set and r != sys.stdin:
                     response = r.recv(4096)
                     if not response:
                         print("Bridge disconnected.")
+                        station_set.remove(r)
                         sys.exit(0)
                     cur_iface = self.fd2iface[r]
                     header = "\nStation: {}>".format(
@@ -173,34 +173,37 @@ class Station:
                         src_ip, src_mac, dest_ip, dest_mac = data["dest_ip"], data[
                             "dest_mac"], data["src_ip"], data["src_mac"]
                         print("[DEBUG] Received arp response of size {} bytes from {}".format(
-                            len(data), dest_ip))
-                        self.arp.add_entry(dest_ip, dest_mac)
+                            len(data), dest_mac))
+                        if dest_ip not in self.arp.table:
+                            self.arp.add_entry(dest_ip, dest_mac)
+                        # print(dest_mac, self.iface[cur_iface].mac)
                         if dest_ip in self.pq.table:
                             packets = self.pq.table[dest_ip]
                             for packet in packets:
+                                self.pq.remove_entry(dest_ip, packet)
                                 data_frame = DataFrame(
                                     packet, src_ip, dest_ip, src_mac, dest_mac)
                                 encrypted_df = pickle.dumps(data_frame)
                                 serialised_frame = pickle.dumps(
                                     {"type": "dataframe", "data": encrypted_df})
-                                print("[DEBUG] Sending dataframe to ", dest_ip)
-                                self.pq.remove_entry(dest_ip)
+                                print("[DEBUG] Sending dataframe to", dest_mac)
+                                ip_packet = pickle.loads(data_frame.packet)
+                                ip_packet.show()
                                 r.send(serialised_frame)
-                                print("sent")
+                            print("sent")                                
                         else:
                             print(
                                 "[DEBUG] Got ARP response but pending queue is empty. Nothing to forward.")
 
                     elif data["type"] == "dataframe":
-                        print("[INFO] Received frame of size {} bytes".format(
-                            len(data["data"])))
                         data_frame = pickle.loads(data["data"])
+                        print("[INFO] Received frame of size {} bytes from {}.\nMy mac address is {}".format(
+                            len(data["data"]), data_frame.dest_mac, self.iface[cur_iface].mac))
                         if data_frame.dest_mac == self.iface[cur_iface].mac:
                             ip_packet = pickle.loads(data_frame.packet)
                             if ip_packet.dest_ip == self.iface[cur_iface].ip and not self.isroute:
                                 ip_packet.show()
-                                print("This IP packet is received from station {}".format(
-                                    self.fd2iface[self.ip2fd[ip_packet.dest_ip]]))
+                                print("This IP packet is received from station {}".format(data_frame.dest_mac))
                                 print("{} >> {}".format(
                                     cur_iface, ip_packet.msg))
                             else:
@@ -220,7 +223,7 @@ class Station:
                 elif r == sys.stdin:
                     msg = sys.stdin.readline()
                     if not msg:
-                        sys.exit(0)
+                        sys.exit(0)        
                     msg_args = msg.split(" ", 1)
                     if msg_args[0] == "send":
                         msg_args = msg.split(" ", 2)
@@ -229,27 +232,32 @@ class Station:
                             print("[ERROR] Unrecognised host.",
                                   dest_host.replace("\n", ""), " not in DNS")
                             break
+                        
                         dest_ip = self.hosts.get_hosts(dest_host)
                         next_hop, src_name = self.get_nexthop(dest_ip, "")
                         print("[DEBUG] Dest ip", dest_ip)
                         print("[DEBUG] Next hop ip", next_hop)
                         print("[DEBUG] Next hop interface", src_name)
+                        
                         fd = self.iface2fd[src_name]
                         src_ip = self.iface[src_name].ip
                         src_mac = self.iface[src_name].mac
+                        
                         ip_packet = IPpacket(
                             msg_args[-1].replace("\n", ""), src_ip, dest_ip)
                         encapsulated_packet = pickle.dumps(ip_packet)
+                        
                         if next_hop in self.arp.table:
-                            print("[DEBUG] Entry in ARP cache")
+                            print("[DEBUG] Entry in ARP cache. Updating timer")
+                            self.arp.reset_timer(next_hop)
                             dest_mac = self.arp.get(next_hop)
                             data_frame = DataFrame(
                                 encapsulated_packet, src_ip, dest_ip, src_mac, dest_mac)
                             encrypted_df = pickle.dumps(data_frame)
                             serialised_frame = pickle.dumps(
                                 {"type": "dataframe", "data": encrypted_df})
-                            print("[INFO] Sending dataframe of size {} bytes".format(
-                                len(serialised_frame)))
+                            print("[INFO] Sending dataframe of size {} bytes to {}".format(
+                                len(serialised_frame), dest_mac))
                             fd.send(serialised_frame)
                         else:
                             print(
@@ -274,6 +282,12 @@ class Station:
                             print("[ERROR] INVALID REQUEST TO STATION")
                             print("AVAILABLE COMMANDS AT STATION")
                             # print all the list of functions - [potato]
+                            
+                    elif "quit" in msg_args[0]:
+                        print("[INFO] Closing station")
+                        for station_fd in self.fd2iface:
+                            station_set.remove(station_fd)
+                        sys.exit(0)
 
     def read_file(self, filename):
         metadata = {} if "iface" in filename else []

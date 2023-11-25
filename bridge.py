@@ -75,6 +75,7 @@ class Bridge:
                                 self.host_ip, addr_info[0], addr_info[1]))
                             self.sock_vector.append(new_conn_sockfd)
                             main_fdset.add(new_conn_sockfd)
+                            nconnections += 1
                     except socket.error as e:
                         print(f"Error accepting connection: {e}")
                         break
@@ -111,16 +112,9 @@ class Bridge:
             src_mac = frame["src_mac"]
             if dest_mac in self.sl.table:
                 print("[INFO] Entry in SL table")
-                # arp_reply = self.arp.reply(frame)
+                self.sl.table[dest_mac]["timer"] = 60
                 forward_fd = self.sl.get(dest_mac)
                 forward_fd.send(data_frame)
-
-            # elif frame["dest_ip"] == frame["src_ip"]:
-            #     print("[DEBUG] Sending arp reply to same port.")
-            #     self.sl.add_entry(src_mac, cur_fd, cur_port)
-            #     frame["dest_mac"] = frame["src_mac"]
-            #     arp_reply = self.arp.reply(frame)
-            #     cur_fd.send(arp_reply)
 
             else:
                 cur_port = self.sock_vector.index(cur_fd)

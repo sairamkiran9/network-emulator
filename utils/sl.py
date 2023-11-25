@@ -17,7 +17,7 @@ class SL:
 
     def get(self, mac):
         entry = self.table.get(mac)
-        if entry and entry["timestamp"] > 0:
+        if entry and entry["timer"] > 0:
             return entry["fd"]
         return ""
 
@@ -25,15 +25,15 @@ class SL:
         self.table[mac] = {
             "fd": fd,
             "port": port,
-            "timestamp": 60
+            "timer": 60
         }
 
     def update_timer(self):
         while True:
             keys = []
             for key in self.table:
-                if self.table[key]["timestamp"] > 0:
-                    self.table[key]["timestamp"] -= 1
+                if self.table[key]["timer"] > 0:
+                    self.table[key]["timer"] -= 1
                 else:
                     keys.append(key)
             time.sleep(1)
@@ -50,6 +50,6 @@ class SL:
 
         for ip, value in self.table.items():
             print("| {:<17} | {:<6} | {:<4} | {:<5} |".format(
-                ip, value["port"], value["fd"].fileno(), value["timestamp"]))
+                ip, value["port"], value["fd"].fileno(), value["timer"]))
         print("+-------------------------------------------+")
         print()
