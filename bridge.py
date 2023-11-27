@@ -83,7 +83,7 @@ class Bridge:
                             main_fdset.add(new_conn_sockfd)
                             nconnections += 1
                     except socket.error as e:
-                        print(f"Error accepting connection: {e}")
+                        print("Error accepting connection:".format(e))
                         break
                 elif nconnections > 0:
                     data = r.recv(4096)
