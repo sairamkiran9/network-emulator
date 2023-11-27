@@ -19,4 +19,4 @@ class IPpacket:
         print("| {:<15} | {:<17} | {:<17} |".format(
             self.msg, self.src_ip, self.dest_ip))
         print("+---------------------------------------------------------+")
-        print()
+        # print()

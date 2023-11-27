@@ -28,6 +28,15 @@ class SL:
             "timer": 60
         }
 
+    def remove_entry(self, fd):
+        key = ""
+        for k,v in self.table.items():
+            if v["fd"] == fd:
+                key = k
+                break
+        if key:
+            del self.table[key]
+        
     def update_timer(self):
         while True:
             keys = []

@@ -7,11 +7,13 @@ Authors:
 
 import sys
 import time
+import signal
 import socket
 import select
 import pickle
 from utils.sl import SL
 from utils.arp import ARP
+from utils.utils import handle_interupt
 
 
 class Bridge:
@@ -64,6 +66,10 @@ class Bridge:
                     if msg_args[0] == "show":
                         if msg_args[1].replace("\n", "") == "sl":
                             self.sl.show()
+                    elif "quit" in msg_args[0]:
+                        print("[INFO] Closing bridge.")
+                        # time.sleep(1)
+                        sys.exit(0)
                     else:
                         print("[DEBUG] Command not valid")
                 elif r == sockfd:
@@ -88,6 +94,7 @@ class Bridge:
                         r.close()
                         main_fdset.remove(r)
                         self.sock_vector.remove(r)
+                        self.sl.remove_entry(r)
                     else:
                         self.handle_frame(data, r)
         return True
@@ -139,6 +146,7 @@ class Bridge:
         elif frame["type"] == "dataframe":
             df = pickle.loads(frame["data"])
             if df.dest_mac in self.sl.table:
+                self.sl.table[df.dest_mac]["timer"] = 60
                 station_fd = self.sl.get(df.dest_mac)
                 if station_fd in self.sock_vector:
                     station_fd.send(data_frame)
@@ -161,6 +169,7 @@ def load_args():
 
 def main():
     args = load_args()
+    signal.signal(signal.SIGINT, handle_interupt)
     bridge = Bridge(args)
     isInitialised = bridge.inititalize()
     if isInitialised:

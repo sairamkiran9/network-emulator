@@ -4,6 +4,8 @@ Authors:
 - [potato]
 """
 
+import sys
+import time
 
 class Interface:
     def __init__(self, params):
@@ -54,3 +56,9 @@ class DataFrame:
             dest_mac \t- {}
             """.format(self.msg, self.dll_src_ip,
                        self.dll_src_mac, self.dll_dest_ip, self.dll_dest_mac))
+
+
+def handle_interupt(signal, frame):
+    print("\n[INFO] Ctrl+C received. Closing Station.")
+    time.sleep(1)
+    sys.exit(0)

@@ -6,6 +6,7 @@ Authors:
 """
 
 import os
+import signal
 import sys
 import time
 import socket
@@ -16,6 +17,7 @@ from utils.arp import ARP
 from utils.hosts import Hosts
 from utils.packet import IPpacket
 from utils.route import RouteTable
+from utils.utils import handle_interupt
 from utils.utils import Interface, DataFrame
 
 
@@ -176,20 +178,23 @@ class Station:
                             len(data), dest_mac))
                         if dest_ip not in self.arp.table:
                             self.arp.add_entry(dest_ip, dest_mac)
-                        # print(dest_mac, self.iface[cur_iface].mac)
                         if dest_ip in self.pq.table:
                             packets = self.pq.table[dest_ip]
+                            print("size of pq",len(packets))
                             for packet in packets:
-                                self.pq.remove_entry(dest_ip, packet)
+                                # packet = packets[i]
+                                print(packet.msg)
                                 data_frame = DataFrame(
                                     packet, src_ip, dest_ip, src_mac, dest_mac)
                                 encrypted_df = pickle.dumps(data_frame)
                                 serialised_frame = pickle.dumps(
                                     {"type": "dataframe", "data": encrypted_df})
                                 print("[DEBUG] Sending dataframe to", dest_mac)
-                                ip_packet = pickle.loads(data_frame.packet)
-                                ip_packet.show()
+                                packet.show()
                                 r.send(serialised_frame)
+                                # self.pq.remove_entry(dest_ip, i)
+                                time.sleep(2)
+                            del self.pq.table[dest_ip]
                             print("sent")                                
                         else:
                             print(
@@ -200,7 +205,8 @@ class Station:
                         print("[INFO] Received frame of size {} bytes from {}.\nMy mac address is {}".format(
                             len(data["data"]), data_frame.dest_mac, self.iface[cur_iface].mac))
                         if data_frame.dest_mac == self.iface[cur_iface].mac:
-                            ip_packet = pickle.loads(data_frame.packet)
+                            # ip_packet = pickle.loads(data_frame.packet)
+                            ip_packet = data_frame.packet
                             if ip_packet.dest_ip == self.iface[cur_iface].ip and not self.isroute:
                                 ip_packet.show()
                                 print("This IP packet is received from station {}".format(data_frame.dest_mac))
@@ -245,14 +251,14 @@ class Station:
                         
                         ip_packet = IPpacket(
                             msg_args[-1].replace("\n", ""), src_ip, dest_ip)
-                        encapsulated_packet = pickle.dumps(ip_packet)
+                        # encapsulated_packet = pickle.dumps(ip_packet)
                         
                         if next_hop in self.arp.table:
                             print("[DEBUG] Entry in ARP cache. Updating timer")
                             self.arp.reset_timer(next_hop)
                             dest_mac = self.arp.get(next_hop)
                             data_frame = DataFrame(
-                                encapsulated_packet, src_ip, dest_ip, src_mac, dest_mac)
+                                ip_packet, src_ip, dest_ip, src_mac, dest_mac)
                             encrypted_df = pickle.dumps(data_frame)
                             serialised_frame = pickle.dumps(
                                 {"type": "dataframe", "data": encrypted_df})
@@ -262,9 +268,9 @@ class Station:
                         else:
                             print(
                                 "[DEBUG] Entry not in ARP cache. Initialising ARP request.")
-                            self.pq.table[next_hop].append(encapsulated_packet)
+                            self.pq.table[next_hop].append(ip_packet)
                             self.init_arp_request(
-                                encapsulated_packet, src_ip, src_mac, next_hop, fd)
+                                ip_packet, src_ip, src_mac, next_hop, fd)
 
                     elif msg_args[0] == "show":
                         cmd = msg_args[1].replace("\n", "")
@@ -287,6 +293,7 @@ class Station:
                         print("[INFO] Closing station")
                         for station_fd in self.fd2iface:
                             station_set.remove(station_fd)
+                        # time.sleep(1)
                         sys.exit(0)
 
     def read_file(self, filename):
@@ -311,7 +318,6 @@ class Station:
                     print("[ERROR]", parsed_line, e)
         return metadata
 
-
 def load_args():
     args = sys.argv
     if len(args) != 5:
@@ -322,6 +328,7 @@ def load_args():
 
 def main():
     args = load_args()
+    signal.signal(signal.SIGINT, handle_interupt)
     station = Station(args)
     station.initialize()
 
