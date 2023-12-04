@@ -1,7 +1,7 @@
 """
 Authors:
 - Sri Sai Ram Kiran Muppana
-- [potato]
+- Sahithi Vungarala
 """
 
 from collections import defaultdict

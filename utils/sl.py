@@ -1,7 +1,7 @@
 """
 Authors:
 - Sri Sai Ram Kiran Muppana
-- [potato]
+- Sahithi Vungarala
 """
 
 import time

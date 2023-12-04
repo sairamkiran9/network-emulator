@@ -2,7 +2,7 @@
 station.py: The main functionality of station and router
 Authors:
 - Sri Sai Ram Kiran Muppana
-- [potato]
+- Sahithi Vungarala
 """
 
 import os
@@ -56,8 +56,8 @@ class Station:
         status = accept_signal.decode()
         if status == "accept":
             message = "[{}][INFO] Bridge accepted my connection request".format(iface)
-            separator = '-' * (len(message)+4)
-            print("\n{}\n| {} |\n{}\n".format(separator, message, separator))
+            # separator = '-' * (len(message)+4)
+            print("\n{}\n".format(message))
             return True
         else:
             print(
@@ -164,6 +164,8 @@ class Station:
                         if data["dest_ip"] == self.hosts.get_hosts(cur_iface):
                             print("[DEBUG] It's My IP sending back ARP response.")
                             data["dest_mac"] = self.iface[cur_iface].mac
+                            if data["src_ip"] in self.arp.table:
+                                print("[DEBUG] Entry already in arp cache. Updating the timer")
                             self.arp.add_entry(data["src_ip"], data["src_mac"])
                             arp_reply = self.arp.reply(data)
                             r.send(arp_reply)
@@ -176,13 +178,13 @@ class Station:
                             "dest_mac"], data["src_ip"], data["src_mac"]
                         print("[DEBUG] Received arp response of size {} bytes from {}".format(
                             len(data), dest_mac))
-                        if dest_ip not in self.arp.table:
-                            self.arp.add_entry(dest_ip, dest_mac)
+                        if dest_ip in self.arp.table:
+                            print("[DEBUG] Entry already in arp cache. Updating the timer")
+                        self.arp.add_entry(dest_ip, dest_mac)
                         if dest_ip in self.pq.table:
                             packets = self.pq.table[dest_ip]
                             print("size of pq",len(packets))
                             for packet in packets:
-                                # packet = packets[i]
                                 print(packet.msg)
                                 data_frame = DataFrame(
                                     packet, src_ip, dest_ip, src_mac, dest_mac)
@@ -207,12 +209,13 @@ class Station:
                         if data_frame.dest_mac == self.iface[cur_iface].mac:
                             # ip_packet = pickle.loads(data_frame.packet)
                             ip_packet = data_frame.packet
+                            ip_packet.show()
                             if ip_packet.dest_ip == self.iface[cur_iface].ip and not self.isroute:
-                                ip_packet.show()
                                 print("This IP packet is received from station {}".format(data_frame.dest_mac))
                                 print("{} >> {}".format(
                                     cur_iface, ip_packet.msg))
                             else:
+                                print("[DEBUG] I'm a router, forwarding the received packet.")
                                 print("[DEBUG] current details",
                                       ip_packet.dest_ip, cur_iface)
                                 next_hop, next_iface = self.get_nexthop(
@@ -231,7 +234,7 @@ class Station:
                     if not msg:
                         sys.exit(0)        
                     msg_args = msg.split(" ", 1)
-                    if msg_args[0] == "send":
+                    if msg_args[0] == "send" and self.isroute != "route":
                         msg_args = msg.split(" ", 2)
                         dest_host = msg.split(" ")[1]
                         if dest_host not in self.hosts.hosts:

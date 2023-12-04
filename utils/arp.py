@@ -1,7 +1,7 @@
 """
 Authors:
 - Sri Sai Ram Kiran Muppana
-- [potato]
+- Sahithi Vungarala
 """
 
 import time
@@ -70,7 +70,7 @@ class ARP:
         print("+---------------------------------------------+")
         print("|                  ARP CACHE                  |")
         print("+---------------------------------------------+")
-        print("|     DEST IP     |    MAC ADDRESS    |  TTL  |")
+        print("|    IP ADDRESS   |    MAC ADDRESS    |  TTL  |")
         print("+---------------------------------------------+")
 
         for ip, value in self.table.items():
