@@ -4,7 +4,11 @@ Authors:
 - Sahithi Vungarala
 """
 
+
 class RouteTable:
+    """route tables class for storing details and calculating nexthop
+    """
+
     def __init__(self, params):
         self.dest_ip = params[0]
         self.next_hop = params[1]
@@ -12,11 +16,19 @@ class RouteTable:
         self.iface = params[3]
 
     def route(self, ip):
+        """Nexthop of routing calculation
+
+        Args:
+            ip (string): destination ip
+
+        Returns:
+            string: nexthop ip
+        """
         dest_ip = ''.join(format(int(x), '08b') for x in ip.split('.'))
         bin_subnet = ''.join(format(int(x), '08b')
                              for x in self.nwmask.split('.'))
         bin_next_prefix = ''.join(str(int(a) & int(b))
-                             for a, b in zip(dest_ip, bin_subnet))
+                                  for a, b in zip(dest_ip, bin_subnet))
         next_prefix = '.'.join(
             str(int(bin_next_prefix[i:i+8], 2)) for i in range(0, 32, 8))
         if self.dest_ip == next_prefix or next_prefix == "0.0.0.0":

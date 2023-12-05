@@ -7,7 +7,11 @@ Authors:
 import sys
 import time
 
+
 class Interface:
+    """Interface class to hold details in a datastructure
+    """
+
     def __init__(self, params):
         self.name = params[0]
         self.ip = params[1]
@@ -23,23 +27,31 @@ class Interface:
             mac \t- {}
             lan \t- {}
             """.format(self.name, self.ip, self.nwmask, self.mac, self.lanname))
-      
+
     def show_ifaces(interfaces):
-        print("+---------------------------------------------------------------------------+")
-        print("|                             Interface Table                               |")
-        print("+---------------------------------------------------------------------------+")
-        print("|  Name  |    ip address   |      nwmask     |    mac address    | lan name |")
-        print("+---------------------------------------------------------------------------+")
+        print(
+            "+---------------------------------------------------------------------------+")
+        print(
+            "|                             Interface Table                               |")
+        print(
+            "+---------------------------------------------------------------------------+")
+        print(
+            "|  Name  |    ip address   |      nwmask     |    mac address    | lan name |")
+        print(
+            "+---------------------------------------------------------------------------+")
 
         for iface, value in interfaces.items():
             print("| {:<6} | {:<15} | {:<15} | {:<17} | {:<8} |".format(
                 value.name, value.ip, value.nwmask, value.mac, value.lanname))
-        print("+---------------------------------------------------------------------------+")
+        print(
+            "+---------------------------------------------------------------------------+")
         print()
-        
 
 
 class DataFrame:
+    """Dataframe class to hold details in a datastructure
+    """
+
     def __init__(self, packet, src_ip, dest_ip, src_mac, dest_mac):
         self.packet = packet
         self.src_ip = src_ip
@@ -58,6 +70,7 @@ class DataFrame:
                        self.dll_src_mac, self.dll_dest_ip, self.dll_dest_mac))
 
 
+# Signal handler for crtl+C
 def handle_interupt(signal, frame):
     print("\n[INFO] Ctrl+C received. Closing Station.")
     time.sleep(1)

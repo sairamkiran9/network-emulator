@@ -6,6 +6,11 @@ Authors:
 
 
 class Hosts:
+    """Hosts dict
+
+    Returns:
+        dict: key value pairs of DNS
+    """
     hosts = {}
 
     def __init__(self, filename):

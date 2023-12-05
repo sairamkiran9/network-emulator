@@ -12,7 +12,7 @@ class SL:
     def __init__(self):
         self.table = {}
         self.timer_thread = threading.Thread(
-            target=self.update_timer, daemon=True)
+            target=self.update_timer, daemon=True)  # timer thread
         self.timer_thread.start()
 
     def get(self, mac):
@@ -30,13 +30,13 @@ class SL:
 
     def remove_entry(self, fd):
         key = ""
-        for k,v in self.table.items():
+        for k, v in self.table.items():
             if v["fd"] == fd:
                 key = k
                 break
         if key:
             del self.table[key]
-        
+
     def update_timer(self):
         while True:
             keys = []

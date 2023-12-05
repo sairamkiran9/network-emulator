@@ -8,10 +8,19 @@ from collections import defaultdict
 
 
 class PQ:
+    """pending queue datastructure class
+    """
+
     def __init__(self):
-        self.table = defaultdict(list)
+        self.table = defaultdict(list)  # empty dict init
 
     def remove_entry(self, ip, i):
+        """removes entry of "ip" key at ith index
+
+        Args:
+            ip (string): key
+            i (string): position of index
+        """
         if ip in self.table:
             self.table[ip].pop(i)
             if self.table[ip] == []:
@@ -30,4 +39,3 @@ class PQ:
                 packet.show()
         print("+"+("="*57)+"+")
         print()
-

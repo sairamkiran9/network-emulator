@@ -8,11 +8,12 @@ import time
 import pickle
 import threading
 
+
 class ARP:
     def __init__(self):
         self.table = {}
         self.timer_thread = threading.Thread(
-            target=self.update_timer, daemon=True)
+            target=self.update_timer, daemon=True)  # timer thread
         self.timer_thread.start()
 
     def get(self, ip):
@@ -39,7 +40,7 @@ class ARP:
             for ip in keys:
                 print("[DEBUG] One entry in arp cache timed out")
                 del self.table[ip]
-                
+
     def reset_timer(self, ip):
         if ip in self.table:
             self.table[ip]["timer"] = 60
@@ -78,4 +79,3 @@ class ARP:
                 ip, value["mac"], value["timer"]))
         print("+---------------------------------------------+")
         print()
-

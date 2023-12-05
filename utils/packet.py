@@ -4,7 +4,11 @@ Authors:
 - Sahithi Vungarala
 """
 
+
 class IPpacket:
+    """IPpacket datastructure class
+    """
+
     def __init__(self, msg, src_ip, dest_ip):
         self.msg = msg
         self.src_ip = src_ip

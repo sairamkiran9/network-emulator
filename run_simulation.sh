@@ -1,5 +1,5 @@
 #!/bin/csh -f
-killall xterm
+# killall xterm
 
 cd $PWD
 

@@ -84,7 +84,7 @@ class Bridge:
         main_fdset = set([sys.stdin, sockfd])
         while 1:
             new_fdset, _, _ = select.select(main_fdset, [], [])  # selector()
-            print("\n")
+            print("Bridge>")
             for r in new_fdset:
                 nconnections = len(self.sock_vector)
                 if r == sys.stdin:  # user input
@@ -167,17 +167,16 @@ class Bridge:
             src_mac = frame["src_mac"]
             if dest_mac in self.sl.table:   # check entry in SL
                 print("[INFO] Entry in SL table")
-                self.sl.table[dest_mac]["timer"] = 60 # updating timer
+                self.sl.table[dest_mac]["timer"] = 60  # updating timer
                 forward_fd = self.sl.get(dest_mac)
                 forward_fd.send(data_frame)
 
             else:
                 cur_port = self.sock_vector.index(cur_fd)
                 print("[INFO] Sending ARP Request to neighbours from port", cur_port)
-                self.sl.add_entry(src_mac, cur_fd, cur_port) # Adding entry to SL cache
-                print(frame["src_ip"],
-                      frame["dest_ip"], "**\n")
-                for fd in self.sock_vector: # Broadcasting the frame
+                # Adding entry to SL cache
+                self.sl.add_entry(src_mac, cur_fd, cur_port)
+                for fd in self.sock_vector:  # Broadcasting the frame
                     if cur_fd != fd:
                         fd.send(data_frame)
 
@@ -185,7 +184,8 @@ class Bridge:
             dest_mac = frame["dest_mac"]
             src_mac = frame["src_mac"]
             src_port = self.sock_vector.index(cur_fd)
-            self.sl.add_entry(src_mac, cur_fd, src_port) # Adding entry to SL cache
+            # Adding entry to SL cache
+            self.sl.add_entry(src_mac, cur_fd, src_port)
             forward_fd = self.sl.get(dest_mac)
             cur_port = self.sock_vector.index(forward_fd)
             print("[INFO] Got ARP Response, forwarding it to port ", cur_port)
@@ -193,8 +193,8 @@ class Bridge:
 
         elif frame["type"] == "dataframe":
             df = pickle.loads(frame["data"])
-            if df.dest_mac in self.sl.table: # check entry in SL
-                self.sl.table[df.dest_mac]["timer"] = 60 # updating timer
+            if df.dest_mac in self.sl.table:  # check entry in SL
+                self.sl.table[df.dest_mac]["timer"] = 60  # updating timer
                 station_fd = self.sl.get(df.dest_mac)
                 if station_fd in self.sock_vector:
                     station_fd.send(data_frame)
@@ -203,7 +203,7 @@ class Bridge:
             else:
                 print("[INFO] Entry not in SL table. Broadcasting the message.")
                 for fd in self.sock_vector:
-                    if fd != cur_fd: # Broadcasting the frame
+                    if fd != cur_fd:  # Broadcasting the frame
                         fd.send(data_frame)
 
 
