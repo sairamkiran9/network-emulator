@@ -1,1 +1,10 @@
-xterm -T "BRIDGE cs1" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu "python3 ~/datacom/dc_p2/bridge.py cs1 8"
+xterm -T "bridge cs1" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "bridge cs2" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "bridge cs3" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "router r1" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "router r2" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "station A" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "station B" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "station C" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "station D" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&
+xterm -T "station E" -iconic -e sshpass -p Shell@1234 ssh muppana@linprog3.cs.fsu.edu&

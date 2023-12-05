@@ -62,7 +62,7 @@
 
 5. Difficulties that we have encountered during the development of the project
 
-    - Pending queue, when there were more than 5 ip-packets in the queue, not all packets are received at the destination. More interestingly only packets at even positions are received. So got into a dilemma and not able to figure out the issue. After ____ we are able to figure out that it's because of receiver buffer size in station. After increasing the buffer size the issue is resolved.
+    - When the pending queue had more than 5 IP packets, not all packets were reaching the destination. Interestingly, only packets at even positions were received. This posed a dilemma, and initially, we were unable to identify the issue. Later, we discovered that the problem was related to the receiver buffer size at the station. After increasing the buffer size, the issue was resolved.
 
 6. A LOG of the progress we make from time to time
 	

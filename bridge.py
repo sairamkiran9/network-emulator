@@ -95,6 +95,8 @@ class Bridge:
                     if msg_args[0] == "show":
                         if msg_args[1].replace("\n", "") == "sl":
                             self.sl.show()
+                        else:
+                            print("[DEBUG] Command not valid")
                     elif "quit" in msg_args[0]:
                         print("[INFO] Closing bridge.")
                         self.quit()
