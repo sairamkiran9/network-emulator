@@ -1,7 +1,7 @@
 #############################################################################
-# Developped by Sri Sai Ram Kiran Muppana & Sahithi Vungarala for the course
+# Developed by Sri Sai Ram Kiran Muppana & Sahithi Vungarala for the course
 #
-# DATA/COMPUTER COMMUNications (CNT5505-01.sp09)  
+# DATA/COMPUTER COMMUNICATIONS (CNT5505-01.sp09)  
 # Computer Science, FSU
 #############################################################################
 
